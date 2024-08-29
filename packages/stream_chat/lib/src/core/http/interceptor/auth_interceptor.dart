@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:stream_chat/src/core/api/responses.dart';
 import 'package:stream_chat/src/core/error/error.dart';
@@ -49,8 +50,24 @@ class AuthInterceptor extends QueuedInterceptor {
     DioException exception,
     ErrorInterceptorHandler handler,
   ) async {
-    final data = exception.response?.data;
-    if (data == null || data is! Map<String, dynamic>) {
+    Map<String, dynamic>? data;
+
+    /// If JWT is expired, we are getting a string as response data.
+    /// The reason is the `content-type` of the header is `text/plain` instead of `application/json`.
+    /// `data` in this case is a string like this:
+    /// `"{"code": 40, "message": "QueryChannels failed with error: \"JWAuth error: token is expired (exp)\"", "StatusCode": 401, "duration":`
+    if (exception.response?.data is String) {
+      try {
+        data = jsonDecode(exception.response?.data);
+      } catch (_) {
+        data = null;
+      }
+    } else {
+      data = exception.response?.data;
+    }
+
+    /// No need to check if `data is! Map<String, dynamic>` anymore.
+    if (data == null) {
       return handler.next(exception);
     }
 
